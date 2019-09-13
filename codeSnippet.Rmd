@@ -1,0 +1,83 @@
+---
+title: 'Code snippet to the paper: <br> Switching between different non-hierarchical administrative
+  areas via simulated geo-coordinates: A case study for student residents in Berlin'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(RColorBrewer)
+```
+
+## Case of application
+
+The proposed method is useful for a situation where counts for a specific regional 
+level are available with their geocoordinates but the distribution on another regional 
+level is of interest.
+
+In the application described in the paper "Switching between different non-hierarchical 
+administrative areas via simulated geo-coordinates: A case study for student residents in Berlin" 
+the numbers of students is known for the zip code level but the administration is 
+interested in the distribution of students on a smaller regional level that is 
+used for urban planning in Berlin, the so-called "Lebensweltlich-orientierte Räume (LOR)". 
+
+
+## Data source and shape files
+
+The data that is available is the number of students by zip code and the latitude
+and longitude of the center of the zip code areas. Please note that the data used
+in this example is random data for the student count so the results cannot be 
+used for any analysis.
+
+```{r data}
+dataZip <- read.csv("dataZip.csv", sep = ";")
+head(dataZip)
+```
+
+Furthermore, the shape file for the zip codes is needed. 
+
+```{r shapeZIP, warning=FALSE, message=FALSE}
+library(rgeos)
+shapefileZip <- rgdal::readOGR("RBS_OD_PLZ_2014.shp", layer="RBS_OD_PLZ_2014")
+plot(shapefileZip)
+```
+
+
+## Estimation
+
+With the dshapebivr function of the R package Kernerlheaping, the bivariate kernel 
+density is estimated using the available data on zip code level and the shape file.
+
+```{r kernelDensity, warning=FALSE, message=FALSE}
+library(Kernelheaping)
+Mestimates <- dshapebivr(data=dataZip, burnin=1, samples=5, shapefile= shapefileZip, 
+                         gridsize = 50, boundary = TRUE)
+```
+
+Another example up to this point is the [estimation of the density of inhabitants between a specific age group](https://www.inwt-statistics.com/read-blog/introducing-the-kernelheaping-package-ii.html). For this
+example, it is also shown [how to exclude uninhabited areas](https://www.inwt-statistics.com/read-blog/introducing-the-kernel-heaping-package-iii.html). 
+
+The switching from the zip code level to the LOR level is provided by function 
+toOtherShape. The arguments are the return of the dshapebivr function and a
+shape file on the LOR level.
+
+
+```{r, results='hide', message=FALSE}
+shapefileLORS <- rgdal::readOGR("RBS_OD_LOR_1412.shp",layer="RBS_OD_LOR_1412")
+LOREstimates <- toOtherShape(Mestimates = Mestimates, shapefile= shapefileLORS)
+```
+
+It returns the average density, standard deviation and the 0.05th and 0.95th 
+quantile.
+
+```{r}
+head(LOREstimates)
+```
+
+
+```{r}
+plot(shapefileLORS, col = brewer.pal(7, "OrRd")[as.numeric(cut(LOREstimates$meanCount,
+                                                               c(0, 10, 20, 50, 100, 500, 1000, Inf),
+                                                               include.lowest = TRUE))])
+```
+
